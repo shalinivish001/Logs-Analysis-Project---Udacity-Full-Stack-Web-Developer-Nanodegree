@@ -1,74 +1,79 @@
-#!/usr/bin/env python
-# Logs Analysis Project
+#!/usr/bin/env python3
 
-# Import postgresql library
 import psycopg2
 
-DBNAME = "news"
+# Database queries
+# Database query 1: What are the three most popular articles of all time?
+request_articles = """select articles.title, count(*) as num
+            from log, articles
+            where log.status='200 OK'
+            and articles.slug = substr(log.path, 10)
+            group by articles.title
+            order by num desc
+            limit 3;"""
 
-query1 = """SELECT *
-            FROM article_views
-            LIMIT 3;"""
+# Database query 2: Who are the most popular article authors of all time?
+request_authors = """select authors.name, count(*) as num
+            from articles, authors, log
+            where log.status='200 OK'
+            and authors.id = articles.author
+            and articles.slug = substr(log.path, 10)
+            group by authors.name
+            order by num desc;
+            """
 
-query2 = """SELECT name, sum(article_views.views) AS views
-            FROM article_authors, article_views
-            WHERE article_authors.title = article_views.title
-            GROUP BY name
-            ORDER BY views desc;"""
+# Database query 3: On which day did more than 1% of requests lead to errors?
+request_errors = """select time, percentagefailed
+            from percentagecount
+            where percentagefailed > 1;
+            """
 
 
-query3 = """SELECT errorlogs.date, round(100.0*errorcount/logcount,2) as percent
-            FROM logs, errorlogs
-            WHERE logs.date = errorlogs.date
-            AND errorcount > logcount/100;"""
-
-
-def connect(query):
-    # Connect to database
-    db = psycopg2.connect(database=DBNAME)
-    c = db.cursor()
-    # Execute queries
-    c.execute(query)
-    # Fetch results
-    results = c.fetchall()
-    db.close()
+# Query data from the database, open and close the connection
+def query_db(sql_request):
+    conn = psycopg2.connect(database="news")
+    cursor = conn.cursor()
+    cursor.execute(sql_request)
+    results = cursor.fetchall()
+    conn.close()
     return results
 
-# Create Views for Question 2 and Question 3 as instructed on the README file.
 
-# Question 1. What are the most popular three articles of all time?
-
-
-def top_three_articles(query):
-    results = connect(query)
-    print('\n Displaying the most popular articles of all time:\n')
-    for i in results:
-        print('\t' + str(i[0]) + ' - ' + str(i[1]) + ' views')
-        print(" ")
+# Writing the report
+# Print a title of the report
+def print_title(title):
+    print ("\n\t\t" + title + "\n")
 
 
-# Question 2. Who are the most popular article authors of all time?
+# Print the top three articles of all time
+def top_three_articles():
+    top_three_articles = query_db(request_articles)
+    print_title("Top 3 articles of all time")
 
-def top_authors(query):
-    results = connect(query)
-    print('\n Displaying the most popular authors of all time:\n')
-    for i in results:
-        print('\t' + str(i[0]) + ' - ' + str(i[1]) + ' views')
-        print(" ")
+    for title, num in top_three_articles:
+        print(" \"{}\" -- {} views".format(title, num))
 
 
-# Question 3. On which days did more than 1% of requests lead to errors?
+# Print the top authors of all time
+def top_three_authors():
+    top_three_authors = query_db(request_authors)
+    print_title("Top authors of all time")
 
-def error_percentage(query):
-    results = connect(query)
-    print('\n The days when more than 1% of requests lead to error:\n')
-    for i in results:
-        print('\t' + str(i[0]) + ' - ' + str(i[1]) + ' %' + ' errors')
-        print(" ")
+    for name, num in top_three_authors:
+        print(" {} -- {} views".format(name, num))
+
+
+# Print the days in which there were more than 1% bad requests
+def high_error_days():
+    high_error_days = query_db(request_errors)
+    print_title("Days with more than one percentage of bad requests")
+
+    for day, percentagefailed in high_error_days:
+        print("""{0:%B %d, %Y}
+            -- {1:.2f} % errors""".format(day, percentagefailed))
+
 
 if __name__ == '__main__':
-	# Print results
-
-    top_three_articles(query1)
-    top_authors(query2)
-    error_percentage(query3)
+    top_three_articles()
+    top_three_authors()
+    high_error_days()
