@@ -1,9 +1,4 @@
-#!/usr/bin/env python3
-
 import psycopg2
-
-# Database queries
-# Database query 1: What are the three most popular articles of all time?
 request_articles = """select articles.title, count(*) as num
             from log, articles
             where log.status='200 OK'
